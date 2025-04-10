@@ -7,10 +7,34 @@ from tkinter import ttk
 from sys import exit
 from typing import NoReturn
 import csv
-
-RUNNING_MODE = "production"
+RUNNING_MODE = "debug"
 root = tk.Tk()
-def debug_crash_decorator(func):
+class Document:
+    def __init__(self, title, posizione, keywords=None, id=None) -> NoReturn:
+        self.id = generate_id()
+        self.title = title
+        self.posizione = posizione
+        self.created_at = (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+        self.updated_at = (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+        self.keywords = keywords or [title]  # Aggiunge il titolo tra le parole chiave se non specificato
+        documents[self.id] = self  # Usa l'ID come chiave nel dizionario
+
+    def __repr__(self) -> str:
+        return f"""Documento:
+            Titolo:    \t{self.title},
+            Posizione: \t{self.posizione},
+            ID:        \t{self.id},
+            Aggiunto al sistema il:  \t{self.created_at}
+            Ultima modifica il:      \t{self.updated_at}  \n"""
+    
+    def update(self, title, posizione, keywords):
+        self.title = title
+        self.posizione = posizione
+        self.updated_at = (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+        self.keywords = keywords
+# Dizionario che conterrà i documenti
+documents = {str:Document} #Formato ID:Document
+def debug_crash_decorator(func) -> any:
     """
     Decorator that wraps a function to handle exceptions.
 
@@ -32,16 +56,13 @@ def debug_crash_decorator(func):
 
     def wrapper(*args, **kwargs):
         try:
+            print(f"Funzione eseguita: {func.__name__}")
             return func(*args, **kwargs)
         except Exception as e:
             if RUNNING_MODE == "debug":  # Se siamo in modalità debug
-
                 exit(f"Errore in modalità debug: {str(e)}")  # Manda il programma in crash
-
             else:
-
                 BOX(f"Errore: {str(e)}")  # Altrimenti stampa l'errore
-
     return wrapper
 
 def BOX(text) -> NoReturn:
@@ -60,6 +81,7 @@ def BOX(text) -> NoReturn:
     
     tk.messagebox.showinfo("PrAC info", text)
 
+@debug_crash_decorator
 def OUT(text) -> NoReturn:
     """
     Shows a message box with the given text.
@@ -83,7 +105,7 @@ def OUT(text) -> NoReturn:
     top_window.attributes("-topmost", True)
     
     # Crea un widget Text (non modificabile)
-    text_widget = tk.Text(top_window, height=10, width=50, wrap=tk.WORD)
+    text_widget = tk.Text(top_window, height=35, width=50, wrap=tk.WORD)
     text_widget.insert(tk.END, text)
     
     # Rendi il widget Text non modificabile
@@ -96,6 +118,7 @@ def OUT(text) -> NoReturn:
     close_button = tk.Button(top_window, text="Chiudi", command=top_window.destroy)
     close_button.pack(pady=10)
 
+@debug_crash_decorator
 def gui_entry(prompt="Inserisci un valore:") -> None | str:    
     """
     Richiede all'utente di inserire un valore tramite finestra di dialogo.
@@ -124,8 +147,7 @@ def gui_entry(prompt="Inserisci un valore:") -> None | str:
 def generate_id() -> str:
     return str(uuid4())
 
-# Dizionario che conterrà i documenti
-documents = {}
+
 
 # Funzione per trovare un documento tramite ID
 @debug_crash_decorator
@@ -147,30 +169,18 @@ def find_by_key(keyword) -> list:
             found_docs.append(document)
     return found_docs
 
-# Classe Document
-class Document:
-    def __init__(self, title, posizione, keywords=None, id=None) -> NoReturn:
-        self.id = generate_id()
-        self.title = title
-        self.posizione = posizione
-        self.created_at = (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
-        self.updated_at = (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
-        self.keywords = keywords or [title]  # Aggiunge il titolo tra le parole chiave se non specificato
-        documents[self.id] = self  # Usa l'ID come chiave nel dizionario
 
-    def __repr__(self) -> str:
-        return f"""Documento:
-            Titolo:    \t{self.title},
-            Posizione: \t{self.posizione},
-            ID:        \t{self.id},
-            Aggiunto al sistema il:  \t{self.created_at}
-            Ultima modifica il:      \t{self.updated_at}  \n"""
-    
-    def update(self, title, posizione, keywords):
-        self.title = title
-        self.posizione = posizione
-        self.updated_at = (datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
-        self.keywords = keywords
+@debug_crash_decorator
+def find_by_position(position) -> list:
+    assert position is not None, "posizione non valida"
+    found_docs = []
+    for document in documents.values():
+        if document.posizione == position:
+            found_docs.append(document)
+    return found_docs
+
+
+
 
 # Funzione per salvare i documenti su file
 @debug_crash_decorator
@@ -218,7 +228,10 @@ def update_document() -> Document:
     OUT(f"Documento aggiornato: {document}")
     return document
 
-
+def gui_find_by_position() -> NoReturn:
+    position = gui_entry("Inserisci la posizione del documento da cercare: ")
+    found_docs = find_by_position(position)
+    OUT(f"Documenti trovati: {found_docs}")
 
 @debug_crash_decorator
 def delete_document() -> NoReturn:
@@ -262,10 +275,12 @@ def export_documents_to_csv(filename='documents.csv') -> NoReturn:
     
     BOX(f"Documenti esportati con successo in '{filename}'.")
 
-def main():
+def main() -> NoReturn:
 
     global root
     global RUNNING_MODE
+
+    print("Benvenuto in PrAC!")
 
     def on_closing() -> NoReturn:
         save_documents()  # Salva i documenti prima di chiudere
@@ -284,22 +299,7 @@ def main():
             "trova con id": find_id_gui,
             "ricerca con parola chiave": find_key_gui,
             "Esporta documenti in csv": lambda: export_documents_to_csv(gui_entry("Inserisci il nome del file CSV: ")),
-            "trova con posizione": lambda: BOX("Trova con posizione non implementato"),
-
-            # English commands
-
-            "create_document": add_document,
-            "edit_document": update_document,
-            "delete_document": lambda: delete_document,
-            "find_document_by_id": lambda: OUT(f"Document found: {find_by_id(gui_entry('Enter the document ID: '))}"),
-            "find_documents_by_keyword": lambda: OUT(f"Documents found: {find_by_key(gui_entry('Enter the keyword: '))}"),
-            "find_with_location": lambda: OUT("Find with location not implemented"),
-            "save_documents": lambda: save_documents(),
-            "load_documents": lambda: load_documents(),
-            "find_by_id": find_id_gui,
-            "search_by_keyword": find_key_gui,
-            "export_documents_to_csv": export_documents_to_csv,
-
+            "trova con posizione": gui_find_by_position,
         }
 
 
@@ -310,14 +310,7 @@ def main():
         assert cmd in commands, f"Comando '{cmd}' non riconosciuto"
         commands[cmd]()
 
-    # Funzione per inviare comandi manuali dalla finestra di comando
-    def send_command() -> NoReturn:
-        cmd = gui_entry_entry.get()
-        gui_entry_entry.delete(0, tk.END)
-        if cmd == "exit":
-            root.quit()  # Chiude l'applicazione
-        else:
-            execute_command(cmd)
+
 
     # Creazione della finestra principale
 
@@ -362,25 +355,6 @@ def main():
             # Rendi le righe e le colonne della griglia espandibili
             section_frame.grid_columnconfigure(i % 4, weight=1)
             section_frame.grid_rowconfigure(i // 4, weight=1)
-
-
-
-    if RUNNING_MODE == "debug-manual":
-        # Finestra per l'invio di comandi manuali
-        command_window = tk.Toplevel(root)
-        command_window.title("Comandi Manuali")
-        command_window.geometry("400x200")
-        command_window.configure(bg="#2c3e50")
-
-        label = tk.Label(command_window, text="Digitazione manuale comandi:", font=("Ariel", 14), bg="#2c3e50", fg="white")
-        label.pack(side=tk.TOP, pady=20)
-
-        gui_entry_entry = ttk.Entry(command_window, width=30)
-        gui_entry_entry.pack(side=tk.TOP, padx=10, pady=2)
-
-        # Bottone per inviare il comando
-        button = ttk.Button(command_window, text="Invia", command=send_command)
-        button.pack(side=tk.TOP, padx=5, pady=10)
 
     # Avvio dell'interfaccia grafica
     root.mainloop()
